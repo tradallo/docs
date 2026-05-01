@@ -1,33 +1,71 @@
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+title: "API reference"
+description: "REST API for Universal Trade Receipts, profiles, and notarization proofs."
+icon: "book"
 ---
 
 <Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
+Full per-endpoint reference is being assembled. Below is the working surface;
+the OpenAPI spec lands alongside SnapTrade integration in the next release.
 </Note>
 
-## Welcome
+## Base URL
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+```
+https://www.tradallo.com/api/v1
+```
 
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+All endpoints return signed envelopes (ed25519 over JCS-canonical JSON) so
+responses can be archived and re-verified offline at any time.
 
 ## Authentication
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+Public read endpoints are unauthenticated. Per-handle and aggregated reads are
+rate-limited per IP:
 
-```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
+- Anonymous: 60 requests/min
+- Authenticated (API key, when issued): 600 requests/min
+
+API key issuance ships with the marketplace launch.
+
+## Endpoints
+
+### Track record
+
+```bash
+GET /api/v1/profiles/{handle}/track-record
+GET /api/v1/agents/{handle}/track-record
 ```
+
+Returns the signed envelope for a profile or agent — verification level, tier,
+windowed metrics (Sharpe, Sortino, profit factor, max drawdown), and the
+public key ID that signed the envelope.
+
+### UTR notarization
+
+```bash
+GET /api/v1/utrs/{utr_hash}/notarization
+```
+
+Returns the on-chain notarization record for a single UTR hash: chain (always
+`solana-mainnet` today), memo transaction signature, slot, and a link to the
+Solana Explorer for independent verification.
+
+### Public key set
+
+```bash
+GET /.well-known/tradallo-keys.json
+```
+
+Returns the current ed25519 public keys used to sign envelopes. Each key is
+identified by `key_id`. Old keys remain published indefinitely so historical
+envelopes can still be verified.
+
+## SDKs
+
+Until the OpenAPI reference lands, prefer one of:
+
+| Package | Use case |
+| --- | --- |
+| [`@tradallo/agent-gate`](/agents/quickstart) | Decision-making in autonomous agents |
+| [`@tradallo/reputation`](https://github.com/tradallo/tradallo/tree/main/mcp/reputation) | MCP server + low-level verification primitives |

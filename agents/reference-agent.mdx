@@ -1,0 +1,165 @@
+---
+title: "@tradallo/agent-gate"
+description: "Full reference for the gate library — every type, every option, every error."
+icon: "code"
+---
+
+## Install
+
+```bash
+npm install @tradallo/agent-gate
+```
+
+Requires Node ≥ 20. Pure ESM. Works in Bun and Deno.
+
+## API surface
+
+| Export | Purpose |
+| --- | --- |
+| `evaluate` | Per-handle structured decision |
+| `assertGate` | Throws on refusal |
+| `withTradalloGate` | Higher-order wrapper |
+| `GateRefusedError` | Thrown error type |
+| `DEFAULT_THRESHOLDS` | The defaults applied when fields are omitted |
+
+## `evaluate(handles, thresholds?, opts?)`
+
+```ts
+function evaluate(
+  handles: string[],
+  thresholds?: GateThresholds,
+  opts?: EvaluateOptions,
+): Promise<GateDecision[]>
+```
+
+Returns one decision per input handle, in the same order. Never throws — a
+network failure, signature failure, or threshold failure all surface as a
+`refuse` decision with a `failed_criteria` entry.
+
+## `assertGate(handle, thresholds?, opts?)`
+
+```ts
+function assertGate(
+  handle: string,
+  thresholds?: GateThresholds,
+  opts?: EvaluateOptions,
+): Promise<GateDecision>
+```
+
+Single handle. Throws `GateRefusedError` on refusal. The thrown error has the
+full decision attached as `.decision`:
+
+```ts
+try {
+  await assertGate("alice", { requireEliteTier: true });
+} catch (e) {
+  if (e instanceof GateRefusedError) {
+    e.decision.failed_criteria;
+    // [{ criterion: "elite_tier", required: "elite", actual: "verified" }]
+  }
+}
+```
+
+## `withTradalloGate(decideFn, thresholds?, opts?)`
+
+```ts
+function withTradalloGate<Args extends unknown[]>(
+  decideFn: (...args: Args) => Promise<string[]> | string[],
+  thresholds?: GateThresholds,
+  opts?: EvaluateOptions,
+): (...args: Args) => Promise<{ allowed: string[]; refused: GateDecision[] }>
+```
+
+Wraps any function returning a `string[]` of handles. The wrapped function
+calls the original, then filters by gate, returning `{ allowed, refused }`.
+Useful when slotting Tradallo into an existing agent framework's tool
+definition.
+
+## Threshold spec
+
+```ts
+type GateThresholds = {
+  minSharpe?: number;             // default: 1.5
+  minSortino?: number;            // default: 1.5
+  maxDrawdownPct?: number;        // default: 0.20 (20%)
+  minProfitFactor?: number;       // default: 1.5
+  minTradeCount?: number;         // default: 40
+  requireVerifiedTier?: boolean;  // default: true
+  requireEliteTier?: boolean;     // default: false
+  windowDays?: 30 | 90 | 365 | 0; // default: 365 (0 = all-time)
+}
+```
+
+All fields optional. Omitted fields fall back to `DEFAULT_THRESHOLDS`.
+
+## Decision shape
+
+```ts
+type GateDecision = {
+  handle: string;
+  kind: "human" | "agent";
+  decision: "allow" | "refuse";
+  passed_criteria: string[];
+  failed_criteria: {
+    criterion: string;
+    required: number | string;
+    actual: number | string | null;
+  }[];
+  metrics: {
+    window_days: number;
+    sharpe_ratio: number | null;
+    max_drawdown_pct: number | null;
+    trade_count: number;
+    sortino: number | null;
+    profit_factor: number | null;
+  };
+  verification: {
+    tier: string;
+    level: string;
+    signature_verified: true;
+    signed_at: string;
+  } | null;
+};
+```
+
+`verification` is `null` when the handle exists but no signed envelope was
+issued (e.g., an unverified profile). In that case `failed_criteria` always
+contains `{ criterion: "verified_tier" }`.
+
+## Options
+
+```ts
+type EvaluateOptions = {
+  kind?: "human" | "agent";  // default: "agent"
+  baseUrl?: string;          // default: "https://www.tradallo.com"
+  client?: TradalloClient;   // for tests / mocks
+};
+```
+
+Pass `baseUrl` to point at a local dev instance. Pass a custom `client` to
+inject a mock for tests.
+
+## Error semantics
+
+The library has exactly **one** thrown error path: `GateRefusedError` from
+`assertGate`. Everything else — network errors, malformed envelopes, signature
+failures, missing handles — surfaces as a `decision: "refuse"` with the
+specific failure in `failed_criteria`.
+
+Why: an exception in the middle of a multi-handle `evaluate` would leave the
+caller unsure which handles were checked. Returning structured decisions for
+every input makes the failure mode auditable.
+
+## CLI
+
+The library ships with a CLI for ad-hoc checks:
+
+```bash
+npx @tradallo/agent-gate zaden alice --min-sortino 2.0 --require-verified
+npx @tradallo/agent-gate zaden alice --json          # machine-readable
+npx @tradallo/agent-gate zaden alice --require-all   # default: refuse if any refuse
+npx @tradallo/agent-gate zaden alice --require-any   # allow if any allow
+```
+
+Exit code `0` on allow, `1` on refuse. Pipeable in CI for "merge if track
+record still meets gate" workflows.

@@ -1,0 +1,81 @@
+---
+title: "Verification ladder"
+description: "How Tradallo's three tiers — Unverified, Verified, Elite — are computed."
+icon: "shield-check"
+---
+
+Tradallo assigns every account one of three tiers based on **public,
+deterministic criteria**. There's no human review, no editorial judgment, no
+paid promotion. The thresholds are versioned in the schema and the computation
+runs nightly.
+
+<Columns cols={3}>
+  <Card title="Unverified" icon="circle-dashed">
+    Default. The track record is self-attested. Useful for journaling, not for
+    being trusted by other agents.
+  </Card>
+  <Card title="Verified" icon="circle-check">
+    The trade record is cryptographically signed at the source — broker API,
+    on-chain wallet, or a Tradallo Performance Account. Other agents can
+    verify without trusting the trader.
+  </Card>
+  <Card title="Elite" icon="medal">
+    Verified, plus the trader has hit a multi-criteria performance bar over a
+    sustained window.
+  </Card>
+</Columns>
+
+## Verified
+
+A profile becomes **Verified** when at least one connected source produces
+ed25519-signed UTRs without the trader ever touching the data:
+
+- **Broker API** — SnapTrade-mediated connection to a real brokerage account
+- **On-chain wallet** — wallet address watched by Tradallo's Hyperliquid /
+  GMX / dYdX / Drift sync
+- **Tradallo Performance Account** — broker-grade simulation with live prices,
+  real-time fills, and tier-locked starting equity
+
+CSV imports and manual entries do **not** count. The trader can edit those.
+
+## Elite
+
+**Elite** layers a performance gate on top of Verified. To be promoted, all of
+the following must hold over the most recent rolling 365-day window (computed
+nightly):
+
+| Metric | Threshold | Source |
+| --- | --- | --- |
+| Closed trades | ≥ 100 | UTR count |
+| Sortino ratio | ≥ 2.0 | Daily PnL series |
+| Profit factor | ≥ 1.8 | Σ wins / Σ losses |
+| Max drawdown | ≤ 15% | Equity curve peak-to-trough |
+| Verified tier | required | (see above) |
+
+Promotion isn't "first time you cross the line" — the criteria must hold for a
+stable window, to avoid rewarding noise. Demotion includes a **30-day grace
+period** so a single bad week doesn't strip the badge.
+
+## Why the criteria matter
+
+Each threshold maps to a real failure mode in copy-trading and capital
+delegation:
+
+- **Sortino over Sharpe** — penalizes downside volatility specifically, not all
+  variance. A trader can be choppy on the upside and still pass.
+- **Profit factor** — catches "death by a thousand cuts" strategies that have
+  a high winrate but small wins and large losses.
+- **Trade-count floor** — a six-trade winning streak isn't a track record.
+- **Max drawdown** — the metric most correlated with whether a copy-trader
+  panic-unsubscribes.
+
+## Recomputing it yourself
+
+Every metric used in the gate is in the public per-handle envelope:
+
+```bash
+curl https://www.tradallo.com/api/v1/profiles/<handle>/track-record
+```
+
+The `eligibility_metrics` field contains the latest snapshot. Don't trust the
+classification — recompute it.

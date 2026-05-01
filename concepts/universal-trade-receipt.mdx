@@ -1,0 +1,94 @@
+---
+title: "Universal Trade Receipt"
+description: "The signed, canonicalized record that makes every trade independently verifiable."
+icon: "signature"
+---
+
+## What it is
+
+A **Universal Trade Receipt (UTR)** is a JSON document describing a single
+closed trade: symbol, side, sizes, prices, timestamps, and the source the trade
+came from (broker API, on-chain wallet, CSV import, Performance Account).
+
+Every UTR is:
+
+1. **Canonicalized** with [JCS (RFC 8785)](https://datatracker.ietf.org/doc/html/rfc8785)
+   so two semantically-equal records produce byte-identical encodings.
+2. **Hashed** with SHA-256 over that canonical form. The hash *is* the UTR's
+   identity.
+3. **Signed** by Tradallo with an ed25519 keypair. The public key is published
+   at [`/.well-known/tradallo-keys.json`](https://www.tradallo.com/.well-known/tradallo-keys.json).
+
+Any party with the canonical JSON, the signature, and the public key can verify
+a UTR offline — no Tradallo API call required.
+
+## The envelope
+
+<CodeGroup>
+```json envelope.json
+{
+  "v": 1,
+  "kind": "trade",
+  "issued_at": "2026-04-30T17:24:18Z",
+  "trade": {
+    "id": "0x4b9c…",
+    "symbol": "BTC-USD",
+    "side": "long",
+    "size": "0.25",
+    "entry_price": "67421.5",
+    "exit_price": "68984.2",
+    "entry_time": "2026-04-30T15:11:02Z",
+    "exit_time": "2026-04-30T17:23:55Z",
+    "pnl_usd": "390.18",
+    "source": "broker_api",
+    "account_hash": "sha256:b81f…"
+  },
+  "signature": {
+    "alg": "ed25519",
+    "key_id": "tradallo-2026-04",
+    "value": "MEUCIQDx8…"
+  }
+}
+```
+</CodeGroup>
+
+## Why JCS, not just `JSON.stringify`
+
+`JSON.stringify` is non-deterministic across runtimes — key order, whitespace,
+and Unicode escapes all vary. JCS pins all of those: sorted keys, no
+whitespace, RFC-8785 number formatting. Two compliant implementations always
+produce the same bytes for the same logical document — which is what makes the
+hash a stable identity.
+
+## On-chain notarization (optional)
+
+If a UTR is opted in for on-chain notarization, Tradallo posts the SHA-256 hash
+to the **Solana memo program** every five minutes. The transaction signature
+and slot become the UTR's permanent timestamp.
+
+```bash Verify a notarization
+curl https://www.tradallo.com/api/v1/utrs/<utr_hash>/notarization
+```
+
+The endpoint returns a signed envelope containing the chain, the memo
+transaction signature, and a link to the Solana Explorer.
+
+<Note>
+On-chain notarization is irreversible. Once a hash is posted to Solana, it
+cannot be removed.
+</Note>
+
+## Verifying a UTR yourself
+
+A reference TypeScript verifier ships in `@tradallo/reputation`:
+
+```ts
+import { TradalloClient, verifyEnvelope } from "@tradallo/reputation";
+
+const client = new TradalloClient();
+const envelope = await client.fetchTrackRecord("zaden", { kind: "human" });
+const ok = await verifyEnvelope(envelope);  // throws if invalid
+```
+
+For agent integrations, prefer [`@tradallo/agent-gate`](/agents/quickstart) —
+it wraps verification + threshold checks behind one call.

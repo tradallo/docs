@@ -1,0 +1,130 @@
+---
+title: "Agent quickstart"
+description: "Add a Tradallo gate to your agent in five minutes."
+icon: "rocket"
+---
+
+## Install
+
+```bash
+npm install @tradallo/agent-gate
+```
+
+No API key required. The library hits public read endpoints on
+`https://www.tradallo.com` and verifies signatures against the published key
+set. Rate limits apply.
+
+## Three patterns
+
+Pick the one that fits how your agent is structured.
+
+### 1. Decide
+
+Get a structured decision per handle. Use this when you want to log refusals,
+expose them in your UI, or layer custom logic on top.
+
+```ts
+import { evaluate } from "@tradallo/agent-gate";
+
+const decisions = await evaluate(["zaden", "alice"], {
+  minSortino: 2.0,
+  minTradeCount: 50,
+  requireVerifiedTier: true,
+});
+
+for (const d of decisions) {
+  if (d.decision === "refuse") {
+    console.log(`refused ${d.handle}:`, d.failed_criteria);
+  }
+}
+```
+
+### 2. Assert
+
+Throw on refusal. Convenient inside `try`/`catch` agent flows where a refusal
+should bubble up as an exception.
+
+```ts
+import { assertGate, GateRefusedError } from "@tradallo/agent-gate";
+
+try {
+  const decision = await assertGate("zaden", { minSortino: 2.0 });
+  // decision.metrics is now safe to use
+} catch (err) {
+  if (err instanceof GateRefusedError) {
+    console.warn("refused:", err.decision.failed_criteria);
+  } else throw err;
+}
+```
+
+### 3. Wrap
+
+Higher-order wrapper that filters any "decide who to follow" function down to
+just the handles that pass the gate. Drop into a framework's tool abstraction
+without rewriting agent logic.
+
+```ts
+import { withTradalloGate } from "@tradallo/agent-gate";
+
+const safePicker = withTradalloGate(myExistingPicker, {
+  minSortino: 1.5,
+  requireVerifiedTier: true,
+});
+
+const { allowed, refused } = await safePicker(...args);
+```
+
+## What just happened
+
+Behind every call:
+
+<Steps>
+  <Step title="Fetch the signed envelope">
+    The library hits `/api/v1/{profiles,agents}/<handle>/track-record` and
+    pulls an ed25519-signed envelope.
+  </Step>
+  <Step title="Verify the signature">
+    Verification runs locally against Tradallo's published key set
+    (`/.well-known/tradallo-keys.json`). A bad signature → automatic refuse,
+    `failed_criteria: [{ criterion: "signature" }]`.
+  </Step>
+  <Step title="Check thresholds">
+    The library walks the threshold spec against the envelope's metrics and
+    returns ALLOW / REFUSE with a list of failed criteria.
+  </Step>
+</Steps>
+
+The point: an unverifiable record is **never** a basis for delegating capital.
+The library makes that the default, not something the agent author has to
+remember.
+
+## Default thresholds
+
+If you don't pass a threshold spec, these apply:
+
+```ts
+{
+  minSharpe: 1.5,
+  minSortino: 1.5,
+  maxDrawdownPct: 0.20,
+  minProfitFactor: 1.5,
+  minTradeCount: 40,
+  requireVerifiedTier: true,
+  requireEliteTier: false,
+  windowDays: 365,
+}
+```
+
+Override only what you care about. Pass `requireEliteTier: true` to gate on
+the strictest tier without specifying every other criterion.
+
+## Next
+
+<Columns cols={2}>
+  <Card title="Reference library" icon="book" href="/agents/reference-agent">
+    Full type signatures and edge cases.
+  </Card>
+  <Card title="UTR concept" icon="signature" href="/concepts/universal-trade-receipt">
+    What the gate is actually verifying.
+  </Card>
+</Columns>
