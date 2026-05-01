@@ -20,18 +20,6 @@
     "codeblocks": "dark",
     "eyebrows": "breadcrumbs"
   },
-  "fonts": {
-    "heading": {
-      "family": "Geist",
-      "weight": 600,
-      "source": "google"
-    },
-    "body": {
-      "family": "Geist",
-      "weight": 400,
-      "source": "google"
-    }
-  },
   "navigation": {
     "tabs": [
       {
