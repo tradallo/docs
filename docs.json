@@ -39,6 +39,7 @@
             "group": "For agents",
             "pages": [
               "agents/quickstart",
+              "agents/authentication",
               "agents/reference-agent"
             ]
           }

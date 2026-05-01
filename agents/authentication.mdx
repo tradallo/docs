@@ -1,0 +1,134 @@
+---
+title: "Authentication"
+description: "API keys for the public agent surface — issuance, tiers, rotation."
+icon: "key"
+---
+
+The Tradallo public agent API at `https://www.tradallo.com/api/v1/` accepts
+two auth modes:
+
+| Mode | How | Budget |
+|---|---|---|
+| Anonymous | No `Authorization` header | 60 req/min per IP |
+| API key | `Authorization: Bearer tdo_live_…` | Per-tier per-key (see below) |
+
+Anonymous is fine for casual reads and demos. Production agents should issue
+an API key — you get a stable per-caller bucket that doesn't get crushed when
+your NAT pool is busy, plus higher per-minute budgets at the paid tiers.
+
+## Tiers and budgets
+
+| Tier | Budget | Webhooks | Notes |
+|---|---|---|---|
+| Free | 60 req/min/key | — | Same numerical budget as anonymous, but per-key (stable) |
+| Active | 600 req/min/key | basic | 10× free; the bucket for an in-prod agent doing routine track-record / UTR polling |
+| Elite | 6,000 req/min/key | full + priority indexing | 100× free; the bucket for a copy-trade fleet operator |
+
+Keys inherit your **current** profile tier — live, not snapshotted. If you
+upgrade, every existing key gets the new budget immediately. If you
+downgrade, every existing key drops to the new budget immediately. No need
+to rotate keys when your tier changes.
+
+## Issuing a key
+
+1. Sign in at [tradallo.com](https://www.tradallo.com).
+2. Open **Settings → API keys**.
+3. Click **New key**, give it a name (e.g. *production agent*), and **copy
+   the full key from the reveal banner immediately**. Tradallo stores only
+   a SHA-256 hash — we cannot show the plaintext again.
+
+Each profile can have up to **25 active keys** at any time. Revoke unused
+keys (the row stays as audit history, no hard delete).
+
+## Using a key
+
+Pass the key as a Bearer token:
+
+```bash
+curl -H "Authorization: Bearer tdo_live_<your-key>" \
+  https://www.tradallo.com/api/v1/agents/alpha-momentum-v3/track-record
+```
+
+`@tradallo/agent-gate` and `@tradallo/reputation` both pick up
+`TRADALLO_API_KEY` from the environment automatically:
+
+```ts
+import { evaluate } from "@tradallo/agent-gate";
+
+// In your shell or process manager:
+//   export TRADALLO_API_KEY="tdo_live_..."
+
+const decisions = await evaluate(["alpha-momentum-v3"], {
+  minSortino: 2.0,
+});
+```
+
+## Key format
+
+Keys look like:
+
+```
+tdo_live_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbC
+└──┬──┘ └─────────────────────┬─────────────────────┘
+ prefix      32 random bytes (base64url)
+```
+
+- **`tdo_live_`** is the only prefix issued today.
+- **`tdo_test_`** is reserved in the schema for a future test mode.
+- Both prefixes are registered with GitHub's secret-scanning partner
+  program — accidentally committing a key to a public repo will trigger
+  an automatic alert and revocation.
+
+## Rate-limit responses
+
+A throttled call returns `429 Too Many Requests` with these headers:
+
+| Header | Meaning |
+|---|---|
+| `Retry-After` | Seconds to wait before retrying |
+| `X-RateLimit-Limit` | Per-minute budget for your tier |
+| `X-RateLimit-Remaining` | Calls remaining in the current window |
+| `X-RateLimit-Reset` | Unix milliseconds when the window resets |
+
+```json
+{
+  "ok": false,
+  "error": "rate_limited",
+  "retry_after_seconds": 23
+}
+```
+
+The Tradallo client libraries (`@tradallo/agent-gate`,
+`@tradallo/reputation`) parse these and back off correctly without your
+code having to handle 429 explicitly.
+
+## Rotation and revocation
+
+- **Rotate**: create a new key, switch your agent to it, then revoke the old
+  one. There's no rotate-in-place — the new-key + revoke-old pattern keeps
+  the audit trail intact.
+- **Revoke**: in Settings → API keys, click **Revoke**. Calls using the key
+  get `401 Unauthorized` immediately. Revoked keys stay in the table so
+  audit lookups (*"which key produced this request?"*) still resolve.
+- **Lost a key**: revoke and create a new one. Tradallo cannot show the
+  plaintext after the initial reveal — only the SHA-256 hash is stored.
+
+## Why no scopes (yet)
+
+The v1 public API is read-only — every endpoint returns signed envelopes of
+publicly verifiable data. There are no mutating endpoints behind API keys,
+so scopes would be granting "read-public" on top of "read-public." When
+mutating endpoints land (webhook subscriptions, x402 payment intents,
+custom indexing pins), keys will gain a `scopes` array and the issuance UI
+will surface checkbox selection.
+
+## Next
+
+<Columns cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/agents/quickstart">
+    Add a Tradallo gate to your agent in five minutes.
+  </Card>
+  <Card title="Reference library" icon="book" href="/agents/reference-agent">
+    Full type signatures and edge cases for `@tradallo/agent-gate`.
+  </Card>
+</Columns>

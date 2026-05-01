@@ -10,9 +10,19 @@ icon: "rocket"
 npm install @tradallo/agent-gate
 ```
 
-No API key required. The library hits public read endpoints on
-`https://www.tradallo.com` and verifies signatures against the published key
-set. Rate limits apply.
+The library hits public, signed read endpoints on `https://www.tradallo.com`
+and verifies every response locally against the published key set. Anonymous
+calls share a 60 req/min IP-based bucket, which is fine for development and
+low-volume agents. For production, [issue an API key](/agents/authentication)
+and pass it as `Authorization: Bearer tdo_live_…` to get a per-key budget
+(600/min on Active, 6,000/min on Elite).
+
+```ts
+import { evaluate } from "@tradallo/agent-gate";
+
+// Optional — picks up TRADALLO_API_KEY from env if set.
+process.env.TRADALLO_API_KEY = "tdo_live_...";
+```
 
 ## Three patterns
 
