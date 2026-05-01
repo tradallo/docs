@@ -1,52 +1,77 @@
 ---
 title: "Tradallo"
 description: "Cryptographically verifiable trading records for human traders and autonomous AI agents."
-icon: "house"
+mode: "wide"
 ---
 
-## What Tradallo is
+<Note>
+**The agent economy needs a primitive for trust.** Trading screenshots are
+fakes. Discord winrates are stories. Tradallo issues every trade as a
+**Universal Trade Receipt** — a tamper-evident, ed25519-signed record that any
+agent can verify without trusting Tradallo, the trader, or any broker.
+</Note>
 
-Tradallo is the missing reputation layer for the agent economy. Every trade
-becomes a **Universal Trade Receipt (UTR)** — a tamper-evident, ed25519-signed
-record that any other agent can verify without trusting Tradallo, the trader,
-or any broker.
-
-Built for two audiences:
+## Built for two audiences
 
 <Columns cols={2}>
-  <Card title="Humans" icon="user" href="/concepts/verification-ladder">
+  <Card title="Humans" icon="user" href="/concepts/verification-ladder" arrow>
     Build a verified track record by connecting a broker, importing on-chain
     history, or running a Tradallo Performance Account. Earn the **Verified**
     and **Elite** badges by hitting public, deterministic criteria.
   </Card>
-  <Card title="Agents" icon="robot" href="/agents/quickstart">
+  <Card title="Agents" icon="robot" href="/agents/quickstart" arrow>
     Gate copy-trading, capital delegation, and signal-following on
     cryptographically-verifiable trader records. Drop-in library: one function
     call, one threshold spec.
   </Card>
 </Columns>
 
-## Start here
+## Core concepts
 
 <Columns cols={2}>
-  <Card title="The Universal Trade Receipt" icon="signature" href="/concepts/universal-trade-receipt">
-    The data structure that makes every trade independently verifiable.
+  <Card title="Universal Trade Receipt" icon="signature" href="/concepts/universal-trade-receipt">
+    The signed envelope that makes every trade independently verifiable.
+    JCS canonicalization, SHA-256 identity, ed25519 signatures.
   </Card>
   <Card title="Verification ladder" icon="shield-check" href="/concepts/verification-ladder">
-    How Unverified, Verified, and Elite tiers are computed.
+    Three tiers — Unverified, Verified, Elite — computed from public,
+    deterministic criteria. No editorial judgment.
   </Card>
-  <Card title="Agent quickstart" icon="rocket" href="/agents/quickstart">
+  <Card title="Performance Accounts" icon="gauge" href="/concepts/performance-accounts">
+    Broker-grade simulation accounts that produce the same signed UTRs as a
+    real broker connection. Build a verified record without risking capital.
+  </Card>
+  <Card title="On-chain notarization" icon="anchor" href="/concepts/on-chain-notarization">
+    Optional Solana memo-program anchoring. Every five minutes, UTR hashes
+    are posted to mainnet for permanent, adversarial-resistant timestamps.
+  </Card>
+</Columns>
+
+## Build with Tradallo
+
+<Columns cols={2}>
+  <Card title="Agent quickstart" icon="rocket" href="/agents/quickstart" arrow>
     Add a Tradallo gate to your agent in five minutes.
   </Card>
-  <Card title="Reference library" icon="code" href="/agents/reference-agent">
-    Full API for `@tradallo/agent-gate`.
+  <Card title="Reference library" icon="code" href="/agents/reference-agent" arrow>
+    Full API for `@tradallo/agent-gate` — every type, every option, every error.
   </Card>
 </Columns>
 
 ## Why this exists
 
-Trading screenshots are fakes. Discord winrates are stories. The agent economy
-needs a primitive for "this performance actually happened, signed by the
-counterparty, and the math holds up to anyone's recomputation."
+The agent economy is forming around a missing primitive. Capital is being
+delegated to autonomous trading agents at increasing scale, but there's no
+universal way to verify the track record of the humans or models being
+followed.
 
-That's Tradallo.
+Existing options all break:
+
+- **Self-reported screenshots** are fakes.
+- **Centralized "verified profiles"** trade trust for editorial discretion.
+- **Pure on-chain wallets** are auditable but only cover crypto-native trades.
+- **Broker-issued statements** can't be cited by third-party software without permission.
+
+Tradallo is the missing layer: signed at the source, verifiable offline,
+optionally anchored on-chain, and queryable by any agent through one library
+call. **Trust, but recompute.**

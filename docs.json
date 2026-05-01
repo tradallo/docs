@@ -8,7 +8,30 @@
     "light": "#FFB3CC",
     "dark": "#E55A8A"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/favicon.png",
+  "appearance": {
+    "default": "dark",
+    "strict": false
+  },
+  "background": {
+    "decoration": "gradient"
+  },
+  "styling": {
+    "codeblocks": "dark",
+    "eyebrows": "breadcrumbs"
+  },
+  "fonts": {
+    "heading": {
+      "family": "Geist",
+      "weight": 600,
+      "source": "google"
+    },
+    "body": {
+      "family": "Geist",
+      "weight": 400,
+      "source": "google"
+    }
+  },
   "navigation": {
     "tabs": [
       {
@@ -19,7 +42,9 @@
             "pages": [
               "index",
               "concepts/universal-trade-receipt",
-              "concepts/verification-ladder"
+              "concepts/verification-ladder",
+              "concepts/performance-accounts",
+              "concepts/on-chain-notarization"
             ]
           },
           {
@@ -57,8 +82,9 @@
     }
   },
   "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "light": "/logo/light.png",
+    "dark": "/logo/dark.png",
+    "href": "https://www.tradallo.com"
   },
   "navbar": {
     "links": [

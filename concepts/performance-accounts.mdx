@@ -1,0 +1,83 @@
+---
+title: "Performance Accounts"
+description: "Broker-grade simulation accounts that count toward your verified record."
+icon: "gauge"
+---
+
+A **Tradallo Performance Account** is a simulated trading account that produces
+the same cryptographically-signed UTRs as a real broker connection. It exists
+because the chicken-and-egg problem of "you need a verified record to be
+trusted, but you need to trade to get a verified record" should not require
+risking real capital.
+
+## Why simulated accounts can be trustworthy
+
+Most "demo accounts" are useless for proving skill: the trader can reset
+balance, edit history, cherry-pick screenshots, or run a hundred parallel
+accounts and only show the winning one. Performance Accounts close every gap:
+
+| Failure mode in typical demo accounts | How a Performance Account closes it |
+| --- | --- |
+| Trader edits trades after the fact | Every fill is signed at the moment of execution; the account is read-only on Tradallo's side |
+| Trader resets balance / restarts | Starting equity is tier-locked and recorded on creation; resets create a new account, not a clean slate |
+| Trader runs N parallel accounts and shows the winner | Account creation is rate-limited per identity; each account's hash is derivable so duplicates are detectable |
+| Fills use stale or favourable prices | All fills run against the live Hyperliquid orderbook with realistic latency |
+| Trader claims a position that wasn't opened | UTRs include the on-chain Hyperliquid transaction hash for the simulated fill |
+
+The result: the trade history that comes out of a Performance Account is
+indistinguishable, on the wire, from the history of a real broker connection
+— same envelope, same signature, same UTR identity.
+
+## How it works
+
+<Steps>
+  <Step title="Pick a tier">
+    Tier-locked starting equity (e.g., `$1,000`, `$10,000`, `$100,000`). The
+    tier is recorded in the account's metadata and signed into every UTR.
+  </Step>
+  <Step title="Route orders through Hyperliquid">
+    Order intents go to Tradallo's simulator, which queries the live
+    Hyperliquid orderbook for the instrument, computes the fill at realistic
+    spread, and returns the simulated execution.
+  </Step>
+  <Step title="Sign the fill">
+    Each closed trade produces a UTR with `source: "sim_event"`. The signing
+    key is the same one used for broker-API and on-chain wallet UTRs — there's
+    no separate "sim key" downstream verifiers need to special-case.
+  </Step>
+  <Step title="Roll into your verified record">
+    The trade history is queryable via the same `/api/v1/profiles/{handle}/track-record`
+    endpoint as real broker connections. It contributes to Verified and Elite
+    eligibility on identical terms.
+  </Step>
+</Steps>
+
+## What this unlocks
+
+- **New traders** can build a track record without burning capital first.
+- **Strategy researchers** can prove a strategy works in live conditions
+  before raising allocations.
+- **Agent authors** can demo their bot against a Performance Account and
+  publish the verified output as part of an audit.
+
+## What it doesn't do
+
+A Performance Account is **not**:
+
+- A path to gaming the verification system — duplicate-identity detection runs
+  on every account creation.
+- A backtester — there's no replay of historical data; fills run against
+  whatever the live orderbook says.
+- A substitute for real-money trading at scale — the highest tier caps at a
+  level designed to validate strategy, not run an institution.
+
+## See also
+
+<Columns cols={2}>
+  <Card title="Verification ladder" icon="shield-check" href="/concepts/verification-ladder">
+    How Performance Account history rolls into Verified and Elite tiers.
+  </Card>
+  <Card title="UTR concept" icon="signature" href="/concepts/universal-trade-receipt">
+    The signed envelope every Performance Account fill produces.
+  </Card>
+</Columns>

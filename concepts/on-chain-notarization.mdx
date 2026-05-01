@@ -1,0 +1,106 @@
+---
+title: "On-chain notarization"
+description: "Optional Solana memo-program anchoring for tamper-evident, permanent UTR timestamps."
+icon: "anchor"
+---
+
+UTRs are signed by Tradallo, which is enough for most consumers — verifying
+the signature against the published key set is a single offline check.
+
+For consumers who want a stronger guarantee — *"this trade existed at this
+specific moment, and Tradallo can't have backdated it"* — UTRs can also be
+**notarized on-chain** by posting their hash to the Solana memo program.
+
+## Why a separate notary layer
+
+Signature verification proves: *Tradallo asserted this UTR is real.*
+
+On-chain notarization proves: *Tradallo asserted this UTR existed before
+slot N.*
+
+The second statement is stronger because it's witnessed by an
+adversarial-resistant network — not just Tradallo's own infrastructure. A
+trader could collude with Tradallo to backdate a signature, but they cannot
+collude to backdate a Solana block.
+
+## How it works
+
+<Steps>
+  <Step title="UTR finalizes">
+    A trade closes, the canonical envelope is built, the SHA-256 hash is
+    computed, the ed25519 signature is added.
+  </Step>
+  <Step title="Hash queues for notarization">
+    If the source account has notarization opted in, the UTR hash is queued.
+    The queue runs every five minutes (Vercel cron).
+  </Step>
+  <Step title="Memo posted to Solana mainnet">
+    The cron picks up unnotarized hashes, batches them into one or more memo
+    transactions on Solana mainnet via the [SPL Memo Program](https://spl.solana.com/memo),
+    and waits for confirmation.
+  </Step>
+  <Step title="Proof recorded">
+    Once confirmed, the memo's transaction signature, slot, and posting
+    timestamp are stored alongside the UTR in `utr_notarizations`.
+  </Step>
+</Steps>
+
+## Verifying a notarization
+
+```bash
+curl https://www.tradallo.com/api/v1/utrs/<utr_hash>/notarization
+```
+
+Returns a signed envelope:
+
+```json
+{
+  "v": 1,
+  "kind": "notarization",
+  "utr_hash": "sha256:b81f…",
+  "chain": "solana-mainnet",
+  "signature": "5VzN…",
+  "slot": 287123456,
+  "posted_at": "2026-04-30T17:25:00Z",
+  "explorer_url": "https://explorer.solana.com/tx/5VzN…",
+  "envelope_signature": {
+    "alg": "ed25519",
+    "key_id": "tradallo-2026-04",
+    "value": "MEUCIQDx8…"
+  }
+}
+```
+
+The `explorer_url` gives anyone a one-click way to confirm the memo
+transaction exists on Solana, contains the expected hash, and was confirmed
+at the expected slot.
+
+## Why Solana
+
+Three reasons:
+
+1. **Memo program is a first-class primitive** — no smart contract to deploy,
+   audit, or upgrade. The instruction is `Memo(bytes)`; the bytes are the UTR
+   hash. Minimal attack surface.
+2. **Sub-second finality** — confirmations land in 1-2 seconds, so the
+   notarization is bounded by the cron interval (5 min), not the chain.
+3. **Sub-cent cost** — even at scale, posting one memo per UTR is in the
+   single-digit-dollar-per-month range. No batching tricks required.
+
+## What it doesn't do
+
+On-chain notarization does **not**:
+
+- Reveal the trade. Only the **hash** is on-chain — the trade itself stays in
+  Tradallo's database. An observer of Solana sees a 32-byte hash, not your
+  symbol/size/PnL.
+- Prove the trade is *correct*. It proves the trade *existed at slot N*. The
+  signature on the UTR is what proves Tradallo asserts it's a real trade.
+- Make the trade reversible. UTRs are immutable in either direction — once
+  the hash is on-chain, removing it is not possible.
+
+<Note>
+Opting out of on-chain notarization keeps the trade fully verifiable via the
+ed25519 signature. Notarization is a stronger guarantee, not the baseline
+guarantee.
+</Note>
