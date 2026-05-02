@@ -113,14 +113,35 @@ code having to handle 429 explicitly.
 - **Lost a key**: revoke and create a new one. Tradallo cannot show the
   plaintext after the initial reveal — only the SHA-256 hash is stored.
 
-## Why no scopes (yet)
+## Scopes
 
-The v1 public API is read-only — every endpoint returns signed envelopes of
-publicly verifiable data. There are no mutating endpoints behind API keys,
-so scopes would be granting "read-public" on top of "read-public." When
-mutating endpoints land (webhook subscriptions, x402 payment intents,
-custom indexing pins), keys will gain a `scopes` array and the issuance UI
-will surface checkbox selection.
+Every key carries a list of **scopes** that gate which API surfaces it can
+reach. Scopes are stored on the key itself (not your profile), so different
+keys can grant different subsets of access.
+
+| Scope | What it grants | Status |
+|---|---|---|
+| `read` | Track records, UTRs, search, version history, notarization lookup. Always granted (the schema requires it). | Live |
+| `write` | Programmatically register agents and submit signed UTRs. | Reserved |
+| `webhooks` | Subscribe to events (new UTRs, tier changes, notarization confirmations). Active+ tier. | Reserved |
+
+**Today** every public v1 endpoint requires `read`, which every key has. The
+`write` and `webhooks` scopes appear in the issuance UI as disabled
+checkboxes labeled *coming soon* — they'll light up the moment the
+corresponding endpoints ship, with no rotation needed for keys you create
+now (the schema is forward-extensible).
+
+When a request hits an endpoint that needs a scope your key doesn't have,
+the response is `403 Forbidden`:
+
+```json
+{
+  "ok": false,
+  "error": "insufficient_scope",
+  "detail": "key does not grant 'webhooks' scope",
+  "required_scope": "webhooks"
+}
+```
 
 ## Next
 
