@@ -10,7 +10,7 @@ two auth modes:
 | Mode | How | Budget |
 |---|---|---|
 | Anonymous | No `Authorization` header | 60 req/min per IP |
-| API key | `Authorization: Bearer tdo_live_…` | Per-tier per-key (see below) |
+| API key | `Authorization: Bearer dallo_live_…` | Per-tier per-key (see below) |
 
 Anonymous is fine for casual reads and demos. Production agents should issue
 an API key — you get a stable per-caller bucket that doesn't get crushed when
@@ -45,7 +45,7 @@ keys (the row stays as audit history, no hard delete).
 Pass the key as a Bearer token:
 
 ```bash
-curl -H "Authorization: Bearer tdo_live_<your-key>" \
+curl -H "Authorization: Bearer dallo_live_<your-key>" \
   https://www.tradallo.com/api/v1/agents/alpha-momentum-v3/track-record
 ```
 
@@ -56,7 +56,7 @@ curl -H "Authorization: Bearer tdo_live_<your-key>" \
 import { evaluate } from "@tradallo/agent-gate";
 
 // In your shell or process manager:
-//   export TRADALLO_API_KEY="tdo_live_..."
+//   export TRADALLO_API_KEY="dallo_live_..."
 
 const decisions = await evaluate(["alpha-momentum-v3"], {
   minSortino: 2.0,
@@ -68,16 +68,18 @@ const decisions = await evaluate(["alpha-momentum-v3"], {
 Keys look like:
 
 ```
-tdo_live_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbC
-└──┬──┘ └─────────────────────┬─────────────────────┘
- prefix      32 random bytes (base64url)
+dallo_live_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbC
+└────┬────┘ └─────────────────────┬─────────────────────┘
+   prefix         32 random bytes (base64url)
 ```
 
-- **`tdo_live_`** is the only prefix issued today.
-- **`tdo_test_`** is reserved in the schema for a future test mode.
-- Both prefixes are registered with GitHub's secret-scanning partner
-  program — accidentally committing a key to a public repo will trigger
-  an automatic alert and revocation.
+- **`dallo_live_`** is the prefix on every newly minted production key.
+- **`dallo_test_`** is reserved in the schema for a future test mode.
+- **`tdo_live_`** / **`tdo_test_`** are accepted at validation as a legacy
+  prefix family — keys minted before the brand prefix change still work.
+- All four prefixes are registered with GitHub's secret-scanning partner
+  program — accidentally committing a key to a public repo triggers an
+  automatic alert and revocation.
 
 ## Rate-limit responses
 
